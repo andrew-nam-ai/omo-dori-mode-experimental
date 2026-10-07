@@ -103,8 +103,8 @@ test("Discord messages are sent without pinging anyone and edited in place; thre
   const dc = new Discord(http, sleeps().clock, "b");
   expect(await dc.send("C1", "hello @everyone")).toBe("M1");
   await dc.edit("C1", "M1", "hello again");
-  expect(await dc.startThread("C1", "M1", "🔄 fix login")).toBe("T1");
-  await dc.setThread("T1", { name: "✅ fix login", archived: true });
+  expect(await dc.startThread("C1", "M1", "[working] fix login")).toBe("T1");
+  await dc.setThread("T1", { name: "[done] fix login", archived: true });
   expect(JSON.parse(String(seen[0]?.body)).allowed_mentions).toEqual({ parse: [] });
   expect(seen.map((r) => `${r.method} ${r.url.replace("https://discord.com/api/v10", "")}`)).toEqual(["POST /channels/C1/messages", "PATCH /channels/C1/messages/M1", "POST /channels/C1/messages/M1/threads", "PATCH /channels/T1"]);
 });

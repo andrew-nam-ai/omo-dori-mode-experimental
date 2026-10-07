@@ -39,6 +39,10 @@ If you pick Slack, the Dori asks one more question and waits for your answer:
 - **User token**: it acts as a real member of your workspace. That takes a paid seat, which you pay for. It reads everything that member can see and can keep a green online dot.
 - **Bot token**: it's a Slack app. There's no seat cost, but it only sees channels it's invited to, within the scopes you gave the app.
 
+## How the Dori writes
+
+It talks the way you do. If you write short, casual and lowercase, it answers short, casual and lowercase. It uses no emojis, in any language. When a reply has several parts, it sends a few short messages instead of one long block, each sent as soon as it's ready, with no artificial pauses. A single status that keeps changing is the exception: that stays one message, edited in place.
+
 ## Configuration
 
 Everything lives in `~/.dori/config.json`, and every field is optional. The ones you will want to set:
