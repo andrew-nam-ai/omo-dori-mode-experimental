@@ -1,5 +1,6 @@
 import type { Clock } from "../run.ts";
 import { guardText, type Http, MessengerError, withBackoff } from "./http.ts";
+import type { ThreadLedger } from "./thread-ledger.ts";
 
 export type SlackAuth = { readonly token: string; readonly cookie?: string };
 export type Posted = { readonly channel: string; readonly ts: string };
@@ -10,6 +11,7 @@ export class Slack {
     private readonly clock: Clock,
     private readonly auth: SlackAuth,
     private readonly base = "https://slack.com/api",
+    private readonly ledger?: ThreadLedger,
   ) {}
 
   private headers(json: boolean): Record<string, string> {
@@ -24,6 +26,10 @@ export class Slack {
     const res = await withBackoff(this.http, this.clock, { method: "POST", url: `${this.base}/${method}`, headers: this.headers(true), body: JSON.stringify(params) });
     const body = JSON.parse(res.body || "{}") as Record<string, unknown>;
     if (res.status !== 200 || body.ok !== true) throw new MessengerError(`slack ${method}: ${String(body.error ?? res.status)}`, res.status, String(body.error ?? ""));
+    if (this.ledger && method === "chat.postMessage" && typeof body.ts === "string") {
+      const channel = String(body.channel ?? params.channel);
+      await this.ledger.record(channel, typeof params.thread_ts === "string" ? params.thread_ts : body.ts, body.ts);
+    }
     return body;
   }
 

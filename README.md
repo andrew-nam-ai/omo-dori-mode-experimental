@@ -1,5 +1,7 @@
 **English** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
+<img src="skills/dori-mode/assets/dori-avatar.png" alt="Dori" width="120" align="right">
+
 # omo-dori-mode-experimental
 
 Dori mode turns one coding-agent session into an always-on messenger agent. You talk to a single bot on Telegram or Discord. The Dori hands each job to its own agent session in a herdr tab, keeps track of every session it started, and only closes one after the work is actually done: the PR merged, the issue closed, the version published.
@@ -29,6 +31,13 @@ macOS gets the full host guard. On Linux, load and disk work, and memory and swa
 ## Naming your Dori
 
 The first thing a Dori does is ask you what it should be called. "Dori" is fine. So is a name that ends in Dori, like ShipDori or WorkDori, which helps when you run more than one. It uses that name for the bot, for how it signs off, and for the mode, so next time "ShipDori mode" is all you have to say.
+
+## Using Slack
+
+If you pick Slack, the Dori asks one more question and waits for your answer:
+
+- **User token**: it acts as a real member of your workspace. That takes a paid seat, which you pay for. It reads everything that member can see and can keep a green online dot.
+- **Bot token**: it's a Slack app. There's no seat cost, but it only sees channels it's invited to, within the scopes you gave the app.
 
 ## Configuration
 
@@ -107,12 +116,15 @@ The CLI also carries the messenger pieces a Dori needs. You can import them as t
 | `dori presence slack\|discord` | keep the account shown online (a Discord bot on the gateway, or a Slack user account through a web-client socket tickled every minute) |
 | `dori transcribe <file>` | turn a voice note into text through your `hooks.transcribe` command |
 | `dori can-launch` | tell whether there's room for another lane |
+| `dori inbound slack [--loop MIN]` | catch everything addressed to the Dori on Slack: unread replies from the Threads view, new replies in any thread it posted in (even untagged ones), and DMs or channels with unread mentions |
 
 The modules also cover a few things that have no command:
 - Telegram: `sendMessageDraft` streaming that starts at "Thinking…", forum topics, and HTML tables.
 - Discord: threads you can start, rename and archive.
 - Slack: file uploads.
 - `typingWhile`, which shows the typing indicator while a piece of work runs.
+
+Every message the Dori posts on Slack records its thread, whichever helper sent it. A reply under a root it posted with a raw API call still reaches it, which is the case a plain message-event listener misses.
 
 Tokens come from `DORI_SLACK_TOKEN` (with `DORI_SLACK_COOKIE` for a user token), `DORI_TELEGRAM_TOKEN` and `DORI_DISCORD_TOKEN`.
 
@@ -139,8 +151,8 @@ If you set up the older OmOMeow mode from the gist, your bot keeps working. Four
 
 1. **Pick a Dori name.** "Dori" on its own, or one that ends in Dori, like ShipDori or WorkDori. Tell your agent: "From now on your name is ShipDori and this is ShipDori mode." From then on, "ShipDori mode" is the keyword that turns it on, in place of "OmOMeow mode".
 2. **Rename the bot and change its picture.**
-   - Telegram: open @BotFather, send `/setname`, pick the bot and send the new name. Then send `/setuserpic`, pick the bot and send the new image. A bot's name and picture can only be changed through BotFather.
-   - Discord: in the Developer Portal, open your application. On the **Bot** page change the username and the icon, and on **General Information** change the app name and icon as well, then save.
+   - Telegram: open @BotFather, send `/setname`, pick the bot and send the new name. Then send `/setuserpic`, pick the bot and send the new image. The default Dori picture is [`skills/dori-mode/assets/dori-avatar.png`](skills/dori-mode/assets/dori-avatar.png); use any image you like. A bot's name and picture can only be changed through BotFather.
+   - Discord: in the Developer Portal, open your application. On the **Bot** page change the username and the icon, and on **General Information** change the app name and icon as well (the same default picture works), then save.
 3. **Install this repo** with the one-line install above, and tell your agent "ShipDori mode". It picks up the skill and the `dori` CLI in place of the old pasted prompt.
 4. **Run onboarding** if your OmOMeow never did. Just say "run onboarding".
 

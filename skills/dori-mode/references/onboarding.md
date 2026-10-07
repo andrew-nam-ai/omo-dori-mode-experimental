@@ -30,6 +30,8 @@ For each tool, say which integration you would use, what it reads, and why. Ask 
 
 > The GitHub CLI (gh) reads your repos, issues and pull requests so I know what you're building. Allow?
 
+If the messenger is Slack, the token choice from setup also sets what onboarding can read there. A user token sees what that member sees. A bot token sees only the channels it was invited to, so ask the owner to invite it where the real work happens.
+
 A no skips that tool. Remember every no, and do not ask about that tool again unless the owner raises it.
 
 ## 4. Crawl each allowed tool in depth, read-only

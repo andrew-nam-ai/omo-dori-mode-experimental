@@ -48,6 +48,8 @@ The CLI is a thin layer over typed modules you can import in your own scripts:
 | `src/messenger/discord.ts` | `Discord`: send without pings, edit, typing, threads (start, rename, archive); gateway presence |
 | `src/messenger/typing.ts` | `typingWhile`: show typing while a piece of work runs, stop when it ends |
 | `src/messenger/voice.ts` | `transcribe`: voice note to text through your hook |
+| `src/messenger/thread-ledger.ts` | `ThreadLedger`: every thread the Dori posts in, persisted; given to `Slack`, it records each `chat.postMessage` (also raw `call`s) |
+| `src/messenger/slack-inbound.ts` | `pollSlackInbound`: threads view, the ledger's threads and unread counts, deduplicated, own messages filtered |
 | `src/messenger/slack-presence.ts` | `slackPresence`: hold a user account active |
 | `src/routing.ts` | `canLaunch`, `idleLaneFor`: the routing checks |
 
@@ -93,6 +95,14 @@ Keeps the account shown as online until stopped.
 - **Discord:** the bot connects to the gateway and identifies as online.
 - **Slack, user token:** it opens one web-client-type socket and tickles it every minute. Slack shows a user active only while such a socket is open, and auto-aways an idle one after about 30 minutes.
 - Run one instance per account. Two writers flip each other's presence.
+
+### `dori inbound slack [--loop MIN]`
+Prints `INBOUND <source> <channel> <thread> <ts> <user> <text>`. It reads from three places, each message once:
+- `threads-view`: unread replies in threads the account follows (Slack's own Threads view);
+- `own-thread`: new replies in any thread the Dori posted in, tagged or not;
+- `unread`: DMs, group DMs and channels with unread mentions.
+
+The Dori's own messages and bot messages are skipped. Every message the Dori posts records its thread in `<stateDir>/slack-threads.json`, whichever helper sends it, so a guest's untagged reply under a root posted with a raw API call is still found.
 
 ### `dori transcribe <audio-file>`
 Runs `hooks.transcribe` and prints the transcript. A failed or empty transcription is an error, never an empty message.

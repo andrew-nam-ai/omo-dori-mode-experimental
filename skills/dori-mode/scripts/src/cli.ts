@@ -14,6 +14,8 @@ import { syncRegistry } from "./sync.ts";
 import { canLaunch } from "./routing.ts";
 import { fetchHttp, MessengerError, UnsafeMessageError } from "./messenger/http.ts";
 import { Slack } from "./messenger/slack.ts";
+import { pollSlackInbound } from "./messenger/slack-inbound.ts";
+import { ThreadLedger } from "./messenger/thread-ledger.ts";
 import { slackPresence } from "./messenger/slack-presence.ts";
 import { Telegram } from "./messenger/telegram.ts";
 import { Discord, discordPresence } from "./messenger/discord.ts";
@@ -37,7 +39,9 @@ const USAGE = `dori <command> [options]
   send <slack|telegram|discord> --to TARGET --text TEXT [--thread ID] [--edit ID]
                                        post or edit a message (tokens from DORI_SLACK_TOKEN, DORI_TELEGRAM_TOKEN, DORI_DISCORD_TOKEN)
   presence <slack|discord>             keep the account shown as online until stopped
-  transcribe <audio-file>              run hooks.transcribe and print the text`;
+  transcribe <audio-file>              run hooks.transcribe and print the text
+  inbound slack [--loop MIN]           print INBOUND lines: unread thread replies (threads view), replies in threads
+                                       the Dori posted in (any helper), DMs and channels with unread mentions`;
 
 const die = (message: string, code = 1): never => {
   console.error(message);
@@ -171,7 +175,7 @@ try {
       const edit = opt("edit");
       const token = (name: string) => process.env[name] ?? die(`${name} is not set`);
       if (platform === "slack") {
-        const slack = new Slack(fetchHttp, realClock, { token: token("DORI_SLACK_TOKEN"), cookie: process.env.DORI_SLACK_COOKIE });
+        const slack = new Slack(fetchHttp, realClock, { token: token("DORI_SLACK_TOKEN"), cookie: process.env.DORI_SLACK_COOKIE }, undefined, new ThreadLedger(`${config.stateDir}/slack-threads.json`));
         if (edit) await slack.edit(to, edit, text);
         else console.log(`SENT ${(await slack.post(to, text, thread)).ts}`);
       } else if (platform === "telegram") {
@@ -207,6 +211,18 @@ try {
         console.log("PRESENCE_READY discord");
         await new Promise(() => {});
       } else die("presence needs slack or discord");
+      break;
+    }
+    case "inbound": {
+      if (key !== "slack") die("inbound supports slack");
+      const auth = { token: process.env.DORI_SLACK_TOKEN ?? die("DORI_SLACK_TOKEN is not set"), cookie: process.env.DORI_SLACK_COOKIE };
+      const ledger = new ThreadLedger(`${config.stateDir}/slack-threads.json`);
+      const slack = new Slack(fetchHttp, realClock, auth, undefined, ledger);
+      const me = String((await slack.call("auth.test", {})).user_id ?? die("auth.test returned no user_id"));
+      console.log("INBOUND_READY slack");
+      await every(loopMin, async () => {
+        for (const i of await pollSlackInbound(slack, ledger, { selfUserId: me })) console.log(`INBOUND ${i.source} ${i.channel} ${i.threadTs ?? "-"} ${i.ts || "-"} ${i.user ?? "-"} ${JSON.stringify((i.text ?? "").slice(0, 200))}`);
+      });
       break;
     }
     case "transcribe":
