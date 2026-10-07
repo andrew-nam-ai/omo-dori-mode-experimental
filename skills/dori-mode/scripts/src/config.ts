@@ -6,6 +6,7 @@ export type ArgvTemplate = readonly string[];
 export type Hooks = {
   readonly threadReply?: ArgvTemplate;
   readonly threadDone?: ArgvTemplate;
+  readonly transcribe?: ArgvTemplate;
 };
 
 export type GuardThresholds = {

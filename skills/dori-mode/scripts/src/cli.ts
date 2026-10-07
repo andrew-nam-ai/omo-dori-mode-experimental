@@ -11,6 +11,14 @@ import { adoptLane, launchLane, LaunchError } from "./launch.ts";
 import { Registry, statusOf } from "./registry.ts";
 import { realClock, run } from "./run.ts";
 import { syncRegistry } from "./sync.ts";
+import { canLaunch } from "./routing.ts";
+import { fetchHttp, MessengerError, UnsafeMessageError } from "./messenger/http.ts";
+import { Slack } from "./messenger/slack.ts";
+import { slackPresence } from "./messenger/slack-presence.ts";
+import { Telegram } from "./messenger/telegram.ts";
+import { Discord, discordPresence } from "./messenger/discord.ts";
+import { realTimers } from "./messenger/typing.ts";
+import { transcribe, TranscriptionError } from "./messenger/voice.ts";
 
 const USAGE = `dori <command> [options]
 
@@ -24,7 +32,12 @@ const USAGE = `dori <command> [options]
   freshness [--loop MIN]               nudge silent lanes, post their last report via hooks.threadReply
   dead-panes [--loop MIN]              print DEAD_PANE <id> for stopped agent panes
   guard [--loop MIN]                   host load, memory, disk and pane-count alerts
-  heavy <label> -- <command ...>       run a heavy command when a slot is free and load is low`;
+  heavy <label> -- <command ...>       run a heavy command when a slot is free and load is low
+  can-launch                           exit 0 if the host has room for a new lane, else print why and exit 4
+  send <slack|telegram|discord> --to TARGET --text TEXT [--thread ID] [--edit ID]
+                                       post or edit a message (tokens from DORI_SLACK_TOKEN, DORI_TELEGRAM_TOKEN, DORI_DISCORD_TOKEN)
+  presence <slack|discord>             keep the account shown as online until stopped
+  transcribe <audio-file>              run hooks.transcribe and print the text`;
 
 const die = (message: string, code = 1): never => {
   console.error(message);
@@ -43,6 +56,7 @@ const flags = parseArgs({
     title: { type: "string" }, brief: { type: "string" }, done: { type: "string" }, thread: { type: "string" },
     model: { type: "string" }, cwd: { type: "string" }, pane: { type: "string" }, evidence: { type: "string" },
     reason: { type: "string", multiple: true }, note: { type: "string" }, write: { type: "boolean" }, loop: { type: "string" },
+    to: { type: "string" }, text: { type: "string" }, edit: { type: "string" },
   },
 });
 const opt = (name: string): string | undefined => {
@@ -144,11 +158,65 @@ try {
       }
       break;
     }
+    case "can-launch": {
+      const v = canLaunch(await sampleHost(run), config.guard);
+      console.log(v.ok ? "CAN_LAUNCH" : `HOLD ${v.reasons.join(" | ")}`);
+      process.exit(v.ok ? 0 : 4);
+    }
+    case "send": {
+      const platform = key ?? die("send needs slack, telegram or discord");
+      const to = need("to");
+      const text = need("text");
+      const thread = opt("thread");
+      const edit = opt("edit");
+      const token = (name: string) => process.env[name] ?? die(`${name} is not set`);
+      if (platform === "slack") {
+        const slack = new Slack(fetchHttp, realClock, { token: token("DORI_SLACK_TOKEN"), cookie: process.env.DORI_SLACK_COOKIE });
+        if (edit) await slack.edit(to, edit, text);
+        else console.log(`SENT ${(await slack.post(to, text, thread)).ts}`);
+      } else if (platform === "telegram") {
+        const tg = new Telegram(fetchHttp, realClock, token("DORI_TELEGRAM_TOKEN"));
+        const target = { chatId: to, ...(thread ? { threadId: Number(thread) } : {}) };
+        if (edit) await tg.edit(target, Number(edit), text);
+        else console.log(`SENT ${await tg.send(target, text)}`);
+      } else if (platform === "discord") {
+        const dc = new Discord(fetchHttp, realClock, token("DORI_DISCORD_TOKEN"));
+        if (edit) await dc.edit(to, edit, text);
+        else console.log(`SENT ${await dc.send(thread ?? to, text)}`);
+      } else die(`unknown platform ${platform}`);
+      break;
+    }
+    case "presence": {
+      if (key === "slack") {
+        const auth = { token: process.env.DORI_SLACK_TOKEN ?? die("DORI_SLACK_TOKEN is not set"), cookie: process.env.DORI_SLACK_COOKIE ?? die("DORI_SLACK_COOKIE is not set (user-token presence needs the d cookie)") };
+        const p = slackPresence(new Slack(fetchHttp, realClock, auth), (url, headers) => {
+          const options: Bun.WebSocketOptions = { headers: { ...headers } };
+          const ws = new WebSocket(url, options);
+          return { isOpen: () => ws.readyState === WebSocket.OPEN, send: (f) => ws.send(f), close: () => ws.close() };
+        }, auth);
+        console.log("PRESENCE_READY slack");
+        await every(1, async () => console.log(`PRESENCE slack ${await p.hold()}`));
+      } else if (key === "discord") {
+        const token = process.env.DORI_DISCORD_TOKEN ?? die("DORI_DISCORD_TOKEN is not set");
+        discordPresence(() => {
+          const ws = new WebSocket("wss://gateway.discord.gg/?v=10&encoding=json");
+          let handler: (d: string) => void = () => {};
+          ws.addEventListener("message", (e) => handler(String(e.data)));
+          return { send: (d) => ws.send(d), close: () => ws.close(), onMessage: (cb) => { handler = cb; } };
+        }, token, realTimers);
+        console.log("PRESENCE_READY discord");
+        await new Promise(() => {});
+      } else die("presence needs slack or discord");
+      break;
+    }
+    case "transcribe":
+      console.log(await transcribe(run, config.hooks.transcribe, key ?? die("transcribe needs an audio file path")));
+      break;
     default:
       console.log(USAGE);
       process.exit(command ? 1 : 0);
   }
 } catch (e) {
-  if (e instanceof LaunchError) die(e.message);
+  if (e instanceof LaunchError || e instanceof UnsafeMessageError || e instanceof MessengerError || e instanceof TranscriptionError) die(e.message);
   throw e;
 }

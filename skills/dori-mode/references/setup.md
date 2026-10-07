@@ -45,6 +45,7 @@ Arm these as persistent monitors in your own session:
 | dead panes | `dori dead-panes --loop 3` | `^DEAD_PANE` |
 | host guard | `dori guard --loop 1` | `^HOST_GUARD` |
 | freshness | `dori freshness --loop 5` | `^(NUDGED\|POSTED\|NO-REPORT)` |
+| presence (optional) | `dori presence slack` or `dori presence discord` | `^PRESENCE_READY` |
 
 ## 6. First look around
 

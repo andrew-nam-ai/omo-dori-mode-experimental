@@ -33,8 +33,25 @@ Needs: bun 1.3+, herdr, git, and the GitHub CLI (`gh`) for `merged`/`closed` sig
 | `deadPanePatterns` | `has stopped`, `no suitable jobs` | `dead-panes` |
 | `guard` | load 150/80, 20% memory, 50 GB disk, 20 panes | `guard` |
 | `hooks.threadReply`, `hooks.threadDone` | none | `freshness`, `close` |
+| `hooks.transcribe` | none | `transcribe` (argv with `{file}`, prints the text) |
 
 Hooks are argv templates for your messenger CLI. `{thread}`, `{text}` and `{key}` are filled into each argument separately, so the text stays one argument whatever it contains.
+
+## Library modules
+
+The CLI is a thin layer over typed modules you can import in your own scripts:
+
+| Module | What it gives you |
+|---|---|
+| `src/messenger/slack.ts` | `Slack`: post, edit, thread replies, file upload (upload URL + complete), presence; 429 backoff |
+| `src/messenger/telegram.ts` | `Telegram`: send, edit, typing, `sendMessageDraft` streaming with a `Thinking…` start, forum topics (create, rename, close, reopen), HTML tables |
+| `src/messenger/discord.ts` | `Discord`: send without pings, edit, typing, threads (start, rename, archive); gateway presence |
+| `src/messenger/typing.ts` | `typingWhile`: show typing while a piece of work runs, stop when it ends |
+| `src/messenger/voice.ts` | `transcribe`: voice note to text through your hook |
+| `src/messenger/slack-presence.ts` | `slackPresence`: hold a user account active |
+| `src/routing.ts` | `canLaunch`, `idleLaneFor`: the routing checks |
+
+Every module takes its HTTP, clock and timers as arguments. That is how the tests run without the network.
 
 ## Commands
 
@@ -64,6 +81,21 @@ Prints `DEAD_PANE <id>` once per hour for a pane whose last lines match `deadPan
 
 ### `dori guard [--loop MIN]`
 Prints `HOST_GUARD ALERT <reasons>` when load, free memory, free disk or the pane count crosses its threshold, and `HOST_GUARD CLEAR` when it recovers. It also prints `COMPUTE_READY` / `COMPUTE_BUSY` as load crosses `loadOk`. Only changes are printed.
+
+### `dori can-launch`
+Prints `CAN_LAUNCH` and exits 0 when the host has room for another lane. Otherwise it prints `HOLD <reasons>` and exits 4. The reasons come from the guard's memory, disk and pane-count thresholds. CPU load alone never holds a launch, because it moves too fast to plan around.
+
+### `dori send <slack|telegram|discord> --to TARGET --text TEXT [--thread ID] [--edit ID]`
+Posts a message, or edits one with `--edit`. Tokens come from `DORI_SLACK_TOKEN` (plus `DORI_SLACK_COOKIE` for a user token), `DORI_TELEGRAM_TOKEN` or `DORI_DISCORD_TOKEN`. Text containing `$(` is refused, since it can only come from a shell string. Rate limits are retried with the server's wait time; other errors fail at once.
+
+### `dori presence <slack|discord>`
+Keeps the account shown as online until stopped.
+- **Discord:** the bot connects to the gateway and identifies as online.
+- **Slack, user token:** it opens one web-client-type socket and tickles it every minute. Slack shows a user active only while such a socket is open, and auto-aways an idle one after about 30 minutes.
+- Run one instance per account. Two writers flip each other's presence.
+
+### `dori transcribe <audio-file>`
+Runs `hooks.transcribe` and prints the transcript. A failed or empty transcription is an error, never an empty message.
 
 ### `dori heavy <label> -- <command ...>`
 Waits until load is under `heavyMaxLoad` and one of `heavySlots` is free, then runs the command and frees the slot when it exits. A slot held by a process that no longer exists (or a zombie) is taken over. Use it for full builds and test suites. Installs, focused tests and git do not need it.

@@ -21,7 +21,22 @@ Run once, in order. Details and commands: `references/setup.md`.
 2. Install agent-messenger, ask the owner which platform (Telegram, Discord, ...), and wait for the answer.
 3. Finish every login in the browser, create the bot, give it its avatar, and greet the owner through it before doing anything else.
 4. Install the scripts in `scripts/` (one command, see `references/setup.md`) and write `~/.dori/config.json` from `references/config.example.json`.
-5. Subscribe to new messages with your monitor tool. Transcribe voice messages and treat the transcript as the owner's message.
+5. Subscribe to new messages with your monitor tool. Transcribe voice messages (`dori transcribe`) and treat the transcript as the owner's message.
+6. Run onboarding (below), unless it has been done before.
+
+## Onboarding
+
+Before you read anything of the owner's, ask in plain words: "To help you well I first need to learn how you work: which tools you use, what you're working on and why, and who you and your company are. That's what lets me do real work for you. May I go through your tools to learn this?"
+
+Only on a yes, go tool by tool. Name each integration and what it would read before you use it, ask for that tool alone, and skip and remember any tool the owner declines. Everything is read-only: nothing is posted, edited or sent. Write memory as you go (what they work on and why, their persona, their company), and finish with a short summary of what you learned and what is still missing. Steps and the per-tool questions: `references/onboarding.md`.
+
+## Routing a request
+
+Decide yourself, at once:
+
+1. **Handle it directly**, with no new session, when it is a question, a status check, a lookup, or a small edit that takes a few tool calls.
+2. **Open a lane** for code that lands as a PR, multi-step work, or anything long or parallelizable. If an idle lane already owns that repo or topic, hand it there instead. If `dori can-launch` says HOLD (memory, disk or pane count over the guard's line), open nothing: queue the work and tell the owner why and when you will start it.
+3. **Threads:** new work gets a new thread. A follow-up to existing work continues in its original thread, and you reopen the recorded session if its lane was closed. A quick question is answered where it was asked.
 
 ## Inbound
 
@@ -73,3 +88,5 @@ Real work runs in its own herdr tab, called a lane. The protocol, with the reaso
 | `dori dead-panes` | report agent panes that stopped |
 | `dori guard` | host load, memory, disk and pane-count alerts |
 | `dori heavy <label> -- <cmd>` | run a heavy command only when a slot is free and load is low |
+| `dori can-launch` | is there room for a new lane? exit 4 with the reasons if not |
+| `dori send` / `dori presence` / `dori transcribe` | messenger utilities: post or edit on Slack, Telegram or Discord; stay shown online; voice note to text |

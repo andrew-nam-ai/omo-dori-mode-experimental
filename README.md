@@ -44,6 +44,21 @@ Everything lives in `~/.dori/config.json`, and every field is optional. The ones
 
 The rest (timings, thresholds, heavy-slot count) has sensible defaults. The full table is in [`references/scripts.md`](skills/dori-mode/references/scripts.md). `DORI_CONFIG`, `DORI_STATE_DIR` and `DORI_LEAD_PANE` override the file.
 
+## Onboarding
+
+On first setup, before it reads anything of yours, the Dori asks whether it may learn how you work: your tools, what you're working on and why, who you and your company are. Only if you say yes does it look at your tools, one at a time. For each one it says which integration it would use and what that reads, for example a CLI that reads Gmail and Calendar so it can watch your schedule, and asks before it touches it. Tools you decline are skipped and remembered.
+
+Everything is read-only. It writes what it learns to memory as it goes and ends with a short summary of what it knows and what's still missing. The full process is in [`references/onboarding.md`](skills/dori-mode/references/onboarding.md).
+
+## Routing a request
+
+The Dori decides on its own how to handle each message.
+
+- Questions, status checks, lookups and small edits get answered directly, with no new session.
+- Code that ends in a PR, multi-step work, and anything long or parallel gets a lane. If an idle lane already owns that repo, the work goes there instead.
+- When the host is short on memory, disk or panes (`dori can-launch` says HOLD), nothing new opens. The work is queued and the Dori tells you why.
+- New work gets a new thread. A follow-up goes back to its original thread, reopening the old session if its lane was closed. A quick question is answered where you asked it.
+
 ## The session registry
 
 Every lane gets one JSON file under `~/.dori/state/lanes/`. It maps the messenger thread to the herdr pane, the pane to the agent's own session id, and records a status: `working`, `done-claimed`, `verified-done`, `not-done` or `closed`. Each change is kept in a history.
@@ -82,6 +97,25 @@ The reason goes straight to the lane, which keeps working and claims again later
 
 Text sent to a pane always goes as one argument, never through a shell string, and the CLI checks that Enter actually landed.
 
+## Utilities
+
+The CLI also carries the messenger pieces a Dori needs. You can import them as typed modules from `scripts/src/messenger/`.
+
+| Command | What it does |
+|---|---|
+| `dori send slack\|telegram\|discord --to T --text X [--thread ID] [--edit ID]` | post or edit a message; rate limits are retried, and text containing `$(` is refused |
+| `dori presence slack\|discord` | keep the account shown online (a Discord bot on the gateway, or a Slack user account through a web-client socket tickled every minute) |
+| `dori transcribe <file>` | turn a voice note into text through your `hooks.transcribe` command |
+| `dori can-launch` | tell whether there's room for another lane |
+
+The modules also cover a few things that have no command:
+- Telegram: `sendMessageDraft` streaming that starts at "Thinking…", forum topics, and HTML tables.
+- Discord: threads you can start, rename and archive.
+- Slack: file uploads.
+- `typingWhile`, which shows the typing indicator while a piece of work runs.
+
+Tokens come from `DORI_SLACK_TOKEN` (with `DORI_SLACK_COOKIE` for a user token), `DORI_TELEGRAM_TOKEN` and `DORI_DISCORD_TOKEN`.
+
 ## Tests
 
 There's no CI. Run the tests locally:
@@ -98,3 +132,16 @@ The tests never touch a real pane, repo or GitHub.
 ## License
 
 MIT
+
+## Migrate from OmOMeow
+
+If you set up the older OmOMeow mode from the gist, your bot keeps working. Four changes turn it into a Dori.
+
+1. **Pick a Dori name.** "Dori" on its own, or one that ends in Dori, like ShipDori or WorkDori. Tell your agent: "From now on your name is ShipDori and this is ShipDori mode." From then on, "ShipDori mode" is the keyword that turns it on, in place of "OmOMeow mode".
+2. **Rename the bot and change its picture.**
+   - Telegram: open @BotFather, send `/setname`, pick the bot and send the new name. Then send `/setuserpic`, pick the bot and send the new image. A bot's name and picture can only be changed through BotFather.
+   - Discord: in the Developer Portal, open your application. On the **Bot** page change the username and the icon, and on **General Information** change the app name and icon as well, then save.
+3. **Install this repo** with the one-line install above, and tell your agent "ShipDori mode". It picks up the skill and the `dori` CLI in place of the old pasted prompt.
+4. **Run onboarding** if your OmOMeow never did. Just say "run onboarding".
+
+Your existing threads, topics and memory stay as they are.
